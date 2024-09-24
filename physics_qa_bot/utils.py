@@ -27,3 +27,7 @@ def base64_encode_image(
     encoded_string = base64.b64encode(byte_arr.getvalue()).decode("utf-8")
     encoded_string = f"data:{mimetype};base64,{encoded_string}"
     return str(encoded_string)
+
+
+def base64_decode_image(image: str) -> Image.Image:
+    return Image.open(io.BytesIO(base64.b64decode(image.split(";base64,")[-1])))
