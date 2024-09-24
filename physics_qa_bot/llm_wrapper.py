@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Union
 
 import weave
@@ -20,7 +21,7 @@ class MultiModalPredictor(weave.Model):
         if self.model_name in OPENAI_MODELS:
             self._llm_client = OpenAI()
         else:
-            self._llm_client = Mistral()
+            self._llm_client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
 
     @weave.op()
     def format_user_prompts(self, prompts: List[str]):
@@ -48,7 +49,9 @@ class MultiModalPredictor(weave.Model):
     ):
         messages = []
         if system_prompt:
-            messages.append(messages)
+            messages.append(
+                {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
+            )
         user_prompt_contents = self.format_user_prompts(user_prompts)
         messages.append({"role": "user", "content": user_prompt_contents})
         if self.model_name in OPENAI_MODELS:
