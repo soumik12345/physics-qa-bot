@@ -162,5 +162,7 @@ cython_debug/
 #.idea/
 
 artifacts/
+dataset/
 wandb/
 test.py
+uv.lock

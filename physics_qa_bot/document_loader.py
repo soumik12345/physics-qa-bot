@@ -1,6 +1,5 @@
 import base64
 import io
-from typing import Optional
 
 import weave
 from pdf2image.pdf2image import convert_from_path
