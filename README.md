@@ -1,1 +1,1 @@
-# physics-qa-bot
+# Physics QA-Bot
