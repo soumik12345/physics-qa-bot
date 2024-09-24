@@ -1,57 +1,59 @@
-import os
-from glob import glob
-from typing import Optional
+import io
+import base64
 
-import markdownify
-import pdfplumber
-from rich.progress import track
-
-import wandb
+import weave
+from openai import OpenAI
+from pdf2image.pdf2image import convert_from_path
 
 
-class PDFConverter:
-    def __init__(self, data_artifact_address: str):
-        if wandb.run is None:
-            api = wandb.Api()
-            artifact = api.artifact(data_artifact_address)
-            self.pdf_file = glob(os.path.join(artifact.download(), "*.pdf"))[0]
-        else:
-            artifact = wandb.use_artifact(data_artifact_address, type="dataset")
-            self.pdf_file = glob(os.path.join(artifact.download(), "*.pdf"))[0]
+class TextExtractionModel(weave.Model):
+    model_name: str
+    _llm_client: OpenAI = None
 
-    def convert_to_markdown(self, markdown_dir: str, max_pages: Optional[int] = None):
-        image_dir = os.path.join(markdown_dir, "images")
-        os.makedirs(os.path.join(markdown_dir, "images"), exist_ok=True)
-        with pdfplumber.open(self.pdf_file) as pdf:
-            all_pages = (
-                pdf.pages
-                if max_pages is None or len(max_pages) > len(pdf.pages)
-                else pdf.pages[:max_pages]
-            )
-            for page_num, page in track(
-                enumerate(all_pages), description="Converting PDF pages to Markdown"
-            ):
-                markdown_content = {}
-                text = page.extract_text()
-                markdown_content = {
-                    "text": (
-                        markdownify.markdownify(text, heading_style="ATX")
-                        if text
-                        else ""
-                    ),
-                    "images": [],
+    def __init__(self, model_name: str):
+        super().__init__(model_name=model_name)
+        self._llm_client = OpenAI()
+
+    @weave.op()
+    def extract_data_from_pdf_file(self, pdf_file: str, page_number: int):
+        images = []
+        images_from_page = convert_from_path(
+            pdf_file, first_page=page_number + 1, last_page=page_number + 1
+        )
+        for image in images_from_page:
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format="PNG")
+            img_bytes = img_byte_arr.getvalue()
+            img_base64 = base64.b64encode(img_bytes)
+            img_base64 = img_base64.decode('utf-8')
+            images.append(f"data:image/jpeg;base64,{img_base64}",)
+        return images
+
+    @weave.op()
+    def predict(self, pdf_file: str):
+        responses = []
+        images = self.extract_data_from_pdf_file(pdf_file, 1)
+        for image in images:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": """
+Extract all the text present in the image in markdown format.
+Make sure to format all mathematical notations and equations in latex format.""",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image, "detail": "high"},
+                        },
+                    ],
                 }
-                images = page.images
-                image_counter = 1
-                for image in images:
-                    image_bbox = image["bbox"]
-                    image_object = page.to_image()
-                    cropped_image = image_object.crop(image_bbox)
-                    image_filename = os.path.join(
-                        image_dir, f"image_{image_counter}_page_{page_num}.png"
-                    )
-                    cropped_image.save(image_filename)
-                    markdown_content["images"].append(image_filename)
-                    image_counter += 1
-                with open(os.path.join(markdown_dir, f"page_{page_num}.md"), "w") as f:
-                    f.write(markdown_content["text"])
+            ]
+            responses.append(
+                self._llm_client.chat.completions.create(model=self.model_name, messages=messages)
+                .choices[0]
+                .message
+            )
+        return responses
