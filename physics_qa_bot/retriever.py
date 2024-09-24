@@ -1,7 +1,10 @@
-from typing import Dict, List
+from typing import Dict, List, Union, cast
 
 import bm25s
+import torch
 import weave
+from colpali_engine import ColPali, ColPaliProcessor
+from PIL import Image
 
 
 class BM25Retriever(weave.Model):
@@ -43,3 +46,47 @@ class BM25Retriever(weave.Model):
     @weave.op()
     def predict(self, query: str, top_k: int = 5):
         return self.search(query, top_k)
+
+
+class ColPaliRetriever(weave.Model):
+    model_name: str
+    processor_name: str
+    device_map: str
+    weave_dataset_address: str
+    _corpus: List[Dict[str, Union[Image.Image, str]]] = []
+    _index: torch.Tensor = None
+    _model: ColPali = None
+    _processor: ColPaliProcessor = None
+
+    def __init__(
+        self,
+        weave_dataset_address: str,
+        model_name: str,
+        processor_name: str,
+        device_map: str = "cuda",
+    ):
+        super().__init__(
+            model_name=model_name,
+            processor_name=processor_name,
+            device_map=device_map,
+            weave_dataset_address=weave_dataset_address,
+        )
+        self._model = cast(
+            ColPali,
+            ColPali.from_pretrained(
+                self.model_name,
+                torch_dtype=torch.bfloat16,
+                device_map=self.device_map,
+            ),
+        )
+        self._processor = cast(
+            ColPaliProcessor, ColPaliProcessor.from_pretrained(self.processor_name)
+        )
+
+    def create_index(self):
+        dataset_rows = [
+            dict(row) for row in weave.ref(self.weave_dataset_address).get().rows
+        ]
+        self._index = self._processor.process_images(
+            [row["image"] for row in dataset_rows]
+        ).to(self._model.device)
