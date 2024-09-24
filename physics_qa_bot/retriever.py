@@ -82,11 +82,3 @@ class ColPaliRetriever(weave.Model):
         self._processor = cast(
             ColPaliProcessor, ColPaliProcessor.from_pretrained(self.processor_name)
         )
-
-    def create_index(self):
-        dataset_rows = [
-            dict(row) for row in weave.ref(self.weave_dataset_address).get().rows
-        ]
-        self._index = self._processor.process_images(
-            [row["image"] for row in dataset_rows]
-        ).to(self._model.device)
