@@ -1,6 +1,8 @@
 import base64
 import io
-from typing import Dict, List, Union
+import os
+from glob import glob
+from typing import Dict, List, Optional, Union
 
 import weave
 from pdf2image.pdf2image import convert_from_path
@@ -8,11 +10,23 @@ from PIL import Image
 from PyPDF2 import PdfReader
 from rich.progress import track
 
+import wandb
+
 from .llm_wrapper import MultiModalPredictor
 
 
 class TextExtractionModel(weave.Model):
+    documents_artifact_address: str
     predictor: MultiModalPredictor
+    _artifact_dir: str
+
+    def __init__(self, documents_artifact_address: str, predictor: MultiModalPredictor):
+        super().__init__(
+            documents_artifact_address=documents_artifact_address, predictor=predictor
+        )
+        api = wandb.Api()
+        artifact = api.artifact(self.documents_artifact_address)
+        self._artifact_dir = artifact.download()
 
     @weave.op()
     def extract_data_from_pdf_file(self, pdf_file: str, page_number: int) -> str:
@@ -27,12 +41,15 @@ class TextExtractionModel(weave.Model):
         return f"data:image/png;base64,{img_base64}"
 
     @weave.op()
-    def predict(self, pdf_file: str) -> List[Dict[str, str]]:
+    def extract_from_pdf_file(self, pdf_file: str) -> List[Dict[str, str]]:
         extracted_document_pages = []
         with open(pdf_file, "rb") as file:
             reader = PdfReader(file)
             total_pages = len(reader.pages)
-        for page_number in track(range(total_pages), description="Reading pages:"):
+        pdf_file_base_name = pdf_file.split("/")[-1]
+        for page_number in track(
+            range(total_pages), description=f"Reading pages from {pdf_file_base_name}:"
+        ):
             image = self.extract_data_from_pdf_file(pdf_file, page_number)
             page_text = self.predictor.predict(
                 user_prompts=[
@@ -65,9 +82,27 @@ Here are a couple of rules you need to follow:
                     "text": page_text,
                     "image_descriptions": image_descriptions,
                     "pdf_file": pdf_file,
+                    "page_number": page_number,
                 }
             )
         return extracted_document_pages
+
+    @weave.op()
+    def predict(self, weave_dataset_name: Optional[str] = None) -> List[Dict[str, str]]:
+        pdf_files = glob(os.path.join(self._artifact_dir, "keph10*.pdf")) + glob(
+            os.path.join(self._artifact_dir, "keph20*.pdf")
+        )
+        all_extracted_document_pages = []
+        for pdf_file in pdf_files:
+            extracted_document_pages = self.extract_from_pdf_file(pdf_file)
+            all_extracted_document_pages += extracted_document_pages
+        if weave_dataset_name:
+            weave.publish(
+                weave.Dataset(
+                    name=weave_dataset_name, rows=all_extracted_document_pages
+                )
+            )
+        return all_extracted_document_pages
 
 
 class PDFImageLoader(weave.Model):

@@ -11,6 +11,7 @@ Install dependencies using the following commands:
 git clone https://github.com/soumik12345/physics-qa-bot
 cd physics-qa-bot
 pip install -U pip uv
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
 uv sync
 ```
 
