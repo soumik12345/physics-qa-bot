@@ -106,6 +106,14 @@ Here are a couple of rules you need to follow:
 
 
 class PDFImageLoader(weave.Model):
+    documents_artifact_address: str
+    _artifact_dir: str
+
+    def __init__(self, documents_artifact_address: str):
+        super().__init__(documents_artifact_address=documents_artifact_address)
+        api = wandb.Api()
+        artifact = api.artifact(self.documents_artifact_address)
+        self._artifact_dir = artifact.download()
 
     @weave.op()
     def extract_data_from_pdf_file(
@@ -120,7 +128,9 @@ class PDFImageLoader(weave.Model):
         return Image.open(io.BytesIO(img_bytes))
 
     @weave.op()
-    def predict(self, pdf_file: str) -> List[Dict[str, Union[Image.Image, str, int]]]:
+    def extract_from_pdf_file(
+        self, pdf_file: str
+    ) -> List[Dict[str, Union[Image.Image, str, int]]]:
         extracted_document_pages = []
         with open(pdf_file, "rb") as file:
             reader = PdfReader(file)
@@ -137,3 +147,20 @@ class PDFImageLoader(weave.Model):
                 }
             )
         return extracted_document_pages
+
+    @weave.op()
+    def predict(self, weave_dataset_name: Optional[str] = None) -> List[Dict[str, str]]:
+        pdf_files = glob(os.path.join(self._artifact_dir, "keph10*.pdf")) + glob(
+            os.path.join(self._artifact_dir, "keph20*.pdf")
+        )
+        all_extracted_document_pages = []
+        for pdf_file in pdf_files:
+            extracted_document_pages = self.extract_from_pdf_file(pdf_file)
+            all_extracted_document_pages += extracted_document_pages
+        if weave_dataset_name:
+            weave.publish(
+                weave.Dataset(
+                    name=weave_dataset_name, rows=all_extracted_document_pages
+                )
+            )
+        return all_extracted_document_pages
