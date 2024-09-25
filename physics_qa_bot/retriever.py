@@ -40,6 +40,7 @@ class BM25Retriever(weave.Model):
                     "image_descriptions": results[0, idx]["image_descriptions"],
                     "source": results[0, idx]["pdf_file"],
                     "score": scores[0, idx],
+                    "dataset_idx": idx,
                 }
             )
         return output
@@ -84,10 +85,9 @@ class BGERetriever(weave.Model):
             retrieved_pages.append(
                 {
                     "text": self._dataset_rows[idx]["text"],
-                    "image_descriptions": self._dataset_rows[idx][
-                        "image_descriptions"
-                    ],
+                    "image_descriptions": self._dataset_rows[idx]["image_descriptions"],
                     "source": self._dataset_rows[idx]["pdf_file"],
+                    "dataset_idx": idx,
                 }
             )
         return retrieved_pages
