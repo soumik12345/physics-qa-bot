@@ -11,6 +11,7 @@ Install dependencies using the following commands:
 git clone https://github.com/soumik12345/physics-qa-bot
 cd physics-qa-bot
 pip install -U pip uv
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
 uv sync
 ```
 
@@ -23,6 +24,27 @@ source .venv/bin/activate
 Finally, you need to get a MistralAI and OpenAI API keys (depending on which model you use).
 
 ## Usage
+
+First, you need to create the document chunks from the PDF documents using a multi-modal model like
+[Pixtral](https://docs.mistral.ai/capabilities/vision/) or [GPT-4o](https://platform.openai.com/docs/models/gpt-4o).
+
+```python
+import weave
+
+import wandb
+from physics_qa_bot.document_loader import TextExtractionModel
+from physics_qa_bot.llm_wrapper import MultiModalPredictor
+
+wandb.init(project="physics-qa-bot", entity="geekyrakshit")
+weave.init(project_name="geekyrakshit/physics-qa-bot")
+text_extraction_model = TextExtractionModel(
+    documents_artifact_address="geekyrakshit/physics-qa-bot/ncert-physics-documents:latest",
+    predictor=MultiModalPredictor(model_name="pixtral-12b-2409"),
+)
+text_extraction_model.predict(weave_dataset_name="ncert-physics-chapter")
+```
+
+Once you have the document chunks, you can use the following code to create a retriever and assistant respectively:
 
 ```python
 import weave
@@ -56,3 +78,7 @@ parts of the plot.
     is_query_problem=True,
 )
 ```
+
+| ![](./assets/weave_trace.png)                              |
+|------------------------------------------------------------|
+| Here's how a [Weave](https://wandb.ai/geekyrakshit/physics-qa-bot/weave/calls/01922705-ba91-7413-aad7-b8fbdcf0919b) trace from the assistant looks like |
