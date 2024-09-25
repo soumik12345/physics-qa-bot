@@ -1,6 +1,7 @@
 # Physics QA-Bot
 
-A multi-modal Physic question-answering bot.
+A multi-modal Physic question-answering bot. The code in this repository is based on the course
+[RAG++ : From POC to Production](https://www.wandb.courses/courses/rag-in-production).
 
 ## Installation
 
