@@ -78,3 +78,7 @@ parts of the plot.
     is_query_problem=True,
 )
 ```
+
+| ![](./assets/weave_trace.png)                              |
+|------------------------------------------------------------|
+| Here's how a [Weave](https://wandb.ai/geekyrakshit/physics-qa-bot/weave/calls/01922705-ba91-7413-aad7-b8fbdcf0919b) trace from the assistant looks like |
