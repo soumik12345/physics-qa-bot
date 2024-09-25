@@ -1,9 +1,10 @@
 import base64
 import io
-from typing import Optional
+from typing import Dict, List, Union
 
 import weave
 from pdf2image.pdf2image import convert_from_path
+from PIL import Image
 from PyPDF2 import PdfReader
 from rich.progress import track
 
@@ -26,7 +27,7 @@ class TextExtractionModel(weave.Model):
         return f"data:image/png;base64,{img_base64}"
 
     @weave.op()
-    def predict(self, pdf_file: str):
+    def predict(self, pdf_file: str) -> List[Dict[str, str]]:
         extracted_document_pages = []
         with open(pdf_file, "rb") as file:
             reader = PdfReader(file)
@@ -64,6 +65,40 @@ Here are a couple of rules you need to follow:
                     "text": page_text,
                     "image_descriptions": image_descriptions,
                     "pdf_file": pdf_file,
+                }
+            )
+        return extracted_document_pages
+
+
+class PDFImageLoader(weave.Model):
+
+    @weave.op()
+    def extract_data_from_pdf_file(
+        self, pdf_file: str, page_number: int
+    ) -> Image.Image:
+        image = convert_from_path(
+            pdf_file, first_page=page_number + 1, last_page=page_number + 1
+        )[0]
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        img_bytes = img_byte_arr.getvalue()
+        return Image.open(io.BytesIO(img_bytes))
+
+    @weave.op()
+    def predict(self, pdf_file: str) -> List[Dict[str, Union[Image.Image, str, int]]]:
+        extracted_document_pages = []
+        with open(pdf_file, "rb") as file:
+            reader = PdfReader(file)
+            total_pages = len(reader.pages)
+        for idx, page_number in track(
+            enumerate(range(total_pages)), description="Reading pages:"
+        ):
+            image = self.extract_data_from_pdf_file(pdf_file, page_number)
+            extracted_document_pages.append(
+                {
+                    "image": image,
+                    "pdf_file": pdf_file,
+                    "page_no": idx,
                 }
             )
         return extracted_document_pages

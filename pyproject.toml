@@ -5,8 +5,12 @@ description = "A physics QA bot"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "markdownify>=0.13.1",
-    "pdfplumber>=0.11.4",
+    "bm25s>=0.2.1",
+    "colpali_engine>=0.3.0",
+    "mistralai>=1.1.0",
+    "openai>=1.47.1",
+    "pdf2image>=1.17.0",
+    "PyPDF2>=3.0.1",
     "wandb>=0.18.1",
     "weave>=0.51.8",
     "pytest>=8.3.3",
